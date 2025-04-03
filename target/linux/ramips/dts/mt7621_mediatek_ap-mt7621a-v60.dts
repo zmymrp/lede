@@ -1,13 +1,19 @@
-/dts-v1/;
-
 #include "mt7621.dtsi"
 
 / {
 	compatible = "mediatek,ap-mt7621a-v60", "mediatek,mt7621-soc";
 	model = "Mediatek AP-MT7621A-V60 EVB";
-
+	
 	chosen {
 		bootargs = "console=ttyS0,57600";
+	};
+
+	watchdog: watchdog {
+		compatible = "linux,wdt-gpio";
+		gpios = <&gpio 27 0>;
+		hw_algo = "toggle";
+		hw_margin_ms = <3000>;
+		always-running;
 	};
 
 	sound {
@@ -36,17 +42,24 @@
 	};
 };
 
+&state_default {
+	gpio {
+		groups = "uart2";
+		function = "gpio";
+	};
+};
+
 &pinctrl {
 	state_default: pinctrl0 {
 		gpio {
-			ralink,group = "uart2", "rgmii2";
+			ralink,group = "rgmii2", "jtag";
 			ralink,function = "gpio";
 		};
 	};
 	i2s_pins: i2s {
 		i2s {
-			ralink,group = "uart3";
-			ralink,function = "i2s";
+			groups = "uart3";
+			function = "i2s";
 		};
 	};
 };
@@ -76,10 +89,11 @@
 &spi0 {
 	status = "okay";
 
-	mx25l6405d@0 {
-		compatible = "mx25l6405d","jedec,spi-nor";
-		reg = <0 0>;
-		spi-max-frequency = <10000000>;
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <45000000>;
+		broken-flash-reset;
 
 		partitions {
 			compatible = "fixed-partitions";
@@ -107,7 +121,7 @@
 			partition@50000 {
 				compatible = "denx,uimage";
 				label = "firmware";
-				reg = <0x50000 0x7b0000>;
+				reg = <0x50000 0x1fb0000>;
 			};
 		};
 	};
@@ -117,8 +131,39 @@
 	status = "okay";
 };
 
-&ethernet {
+&gmac0 {
 	mtd-mac-address = <&factory 0x5>;
+};
+
+&switch0 {
+	ports {
+		port@0 {
+			status = "okay";
+			label = "lan1";
+		};
+
+		port@1 {
+			status = "okay";
+			label = "lan2";
+		};
+
+		port@2 {
+			status = "okay";
+			label = "lan3";
+		};
+
+		port@3 {
+			status = "okay";
+			label = "lan4";
+		};
+
+		port@4 {
+			status = "okay";
+			label = "wan";
+			mtd-mac-address = <&factory 0x5>;
+			mtd-mac-address-increment = <1>;
+		};
+	};
 };
 
 &pcie {

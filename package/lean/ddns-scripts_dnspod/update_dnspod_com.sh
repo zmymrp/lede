@@ -5,10 +5,11 @@
 [ -z "$password" ] && write_log 14 "Configuration error! [Password] cannot be empty"
 
 #检查外部调用工具
-[ -n "$WGET_SSL" ] || write_log 13 "GNU Wget support is required to use Alibaba Cloud API. Please install first"
+WGET_SSL='wget'
+[ -n "$WGET_SSL" ] || write_log 13 "GNU Wget support is required to use dnspod API. Please install first"
 
 # 变量声明
-local __URLBASE __HOST __DOMAIN __TYPE __CMDBASE __TOKEN __POST __POST1 __RECIP __RECID __value __TTL
+local __URLBASE __HOST __DOMAIN __TYPE __CMDBASE __POST __POST1 __RECIP __RECID __value __TTL
 __URLBASE="https://api.dnspod.com/"
 
 # 从 $domain 分离主机和域名
@@ -23,7 +24,7 @@ __DOMAIN="${domain#*@}"
 
 # 构造基本通信命令
 build_command() {
-	__CMDBASE="$WGET_SSL -nv -t 1 -O $DATFILE -o $ERRFILE"
+	__CMDBASE="$WGET_SSL --no-hsts -nv -t 1 -O $DATFILE -o $ERRFILE"
 	# 绑定用于通信的主机/IP
 	if [ -n "$bind_network" ]; then
 		local bind_ip run_prog
@@ -59,34 +60,27 @@ dnspod_transfer() {
 	local __A=$1
 	local __CNT=0
 	local __ERR=0
-	local __B __C PID_SLEEP
+	local __B PID_SLEEP
 	case "$__A" in
 		0)
-		__B="$__CMDBASE 'login_email=$username&login_password=$password&format=json' ${__URLBASE}Auth"
-		__C=$__B
+		__B="$__CMDBASE '$__POST' ${__URLBASE}Record.List"
 			;;
 		1)
-		__B="$__CMDBASE '$__POST' ${__URLBASE}Record.List"
-		__C=1
+		__B="$__CMDBASE '$__POST1' ${__URLBASE}Record.Create"
 			;;
 		2)
-		__B="$__CMDBASE '$__POST1' ${__URLBASE}Record.Create"
-		__C=1
-			;;
-		3)
 		__B="$__CMDBASE '$__POST1&record_id=$__RECID&ttl=$__TTL' ${__URLBASE}Record.Modify"
-		__C=1
 			;;
 	esac
 
 	while : ; do
-		[ $__C -eq 1 ] && __C=$(echo -e "$__B" | sed -e "s/${__TOKEN#*,}/***PW***/g")
-		write_log 7 "#> $__C"
+		write_log 7 "#> $__B"
 		eval $__B
 		__ERR=`jsonfilter -i $DATFILE -e "@.status.code"`
 
 		[ $__ERR -eq 1 ] && return 0
-		[ $__ERR -ne 0 ] && write_log 3 "Error message:[$(jsonfilter -i $DATFILE -e "@.status.message")]"
+		[ $__A -eq 0 ] && [ $__ERR -eq 10 ] && return 0
+		write_log 3 "Error message:[$(jsonfilter -i $DATFILE -e "@.status.message")]"
 
 		if [ $VERBOSE -gt 1 ]; then
 			write_log 4 "Transfer failed - detailed mode: $VERBOSE - Do not try again after an error"
@@ -106,45 +100,45 @@ dnspod_transfer() {
 
 #添加解析记录
 add_domain() {
-dnspod_transfer 2
-write_log 7 "Add new parsing record [${__HOST}.${__DOMAIN}],[type:$__TYPE],[ip:$__IP] successfully!"
-return 0
+	dnspod_transfer 1
+	write_log 7 "Add new parsing record [${__HOST}.${__DOMAIN}],[type:$__TYPE],[ip:$__IP] successfully!"
+	return 0
 }
 
 #修改解析记录
 update_domain() {
-dnspod_transfer 3
-write_log 7 "Modify new parsing record [${__HOST}.${__DOMAIN}],[type:$__TYPE],[ip:$__IP],[TTL:$__TTL] successfully!"
-return 0
+	dnspod_transfer 2
+	write_log 7 "Modify new parsing record [${__HOST}.${__DOMAIN}],[type:$__TYPE],[ip:$__IP],[TTL:$__TTL] successfully!"
+	return 0
 }
 
 #获取域名解析记录
 describe_domain() {
 	ret=0
+	__POST="login_token=$username,$password&format=json&domain=$__DOMAIN&sub_domain=$__HOST&record_type=$__TYPE"
+	__POST1="$__POST&value=$__IP&record_type=$__TYPE&record_line_id=0"
 	dnspod_transfer 0
-	__TOKEN=`jsonfilter -i $DATFILE -e "@.user_token"`
-	__POST="user_token=$__TOKEN&format=json&domain=$__DOMAIN"
-	__POST1="$__POST&sub_domain=$__HOST&value=$__IP&record_type=$__TYPE&record_line=default"
-	dnspod_transfer 1
-	__value=`jsonfilter -i $DATFILE -e "@.records[@.name='$__HOST'].name"`
+	__TMP=`jsonfilter -i $DATFILE -e "@.records[@.type!='NS']"`
+	__value=`jsonfilter -s "$__TMP" -e "@.name"`
 	if [ "$__value" == "" ]; then
 		write_log 7 "Parsing record:[${__HOST}.${__DOMAIN}] does not exist"
 		ret=1
 	else
-		__value=`jsonfilter -i $DATFILE -e "@.records[@.name='$__HOST'].type"`
+		__RECID=`jsonfilter -s "$__TMP" -e "@.id"`
+		__value=`jsonfilter -s "$__TMP" -e "@.type"`
+		__TTL=`jsonfilter -s "$__TMP" -e "@.ttl"`
+		write_log 7 "Get parsing recordID:[$__RECID]"
 		if [ "$__value" != "$__TYPE" ]; then
 			write_log 7 "Current parsing [type:$__TYPE], get mismatched [type:$__value]"
+			write_log 7 "Address needs to be modified, local address:[$__IP]"
 			ret=2
 		else
-			__RECID=`jsonfilter -i $DATFILE -e "@.records[@.name='$__HOST'].id"`
-			write_log 7 "Get parsing recordID:[$__RECID]"
-			__RECIP=`jsonfilter -i $DATFILE -e "@.records[@.name='$__HOST'].value"`
+			__RECIP=`jsonfilter -s "$__TMP" -e "@.value"`
 			if [ "$__RECIP" != "$__IP" ]; then
 				write_log 7 "Address needs to be modified, local address:[$__IP]"
 				ret=2
 			fi
 		fi
-		__TTL=`jsonfilter -i $DATFILE -e "@.records[@.name='$__HOST'].ttl"`
 	fi
 }
 

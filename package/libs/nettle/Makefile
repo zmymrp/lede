@@ -8,17 +8,18 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=nettle
-PKG_VERSION:=3.4.1
+PKG_VERSION:=3.9
 PKG_RELEASE:=1
 PKG_USE_MIPS16:=0
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=@GNU/nettle
-PKG_HASH:=f941cf1535cd5d1819be5ccae5babef01f6db611f9b5a777bae9c7604b8a92ad
+PKG_HASH:=0ee7adf5a7201610bb7fe0acbb7c9b3be83be44904dd35ebbcd965cd896bfeaa
 
-PKG_LICENSE:=GPL-2.0+
+PKG_LICENSE:=GPL-2.0-or-later
 PKG_LICENSE_FILES:=COPYING
-PKG_BUILD_PARALLEL:=0
+PKG_CPE_ID:=cpe:/a:nettle_project:nettle
+PKG_BUILD_PARALLEL:=1
 
 PKG_CONFIG_DEPENDS := CONFIG_LIBNETTLE_MINI
 
@@ -30,6 +31,7 @@ define Package/libnettle
   TITLE:=GNU crypto library
   URL:=http://www.lysator.liu.se/~nisse/nettle/
   DEPENDS+= +!LIBNETTLE_MINI:libgmp
+  ABI_VERSION:=8
 endef
 
 define Package/libnettle/config
@@ -43,7 +45,8 @@ CONFIGURE_ARGS += \
 	--enable-fat \
 	--disable-openssl \
 	--disable-documentation \
-	--enable-static
+	--enable-static \
+	$(if $(CONFIG_powerpc64), $(if $(CONFIG_USE_MUSL),--disable-assembler))
 
 ifeq ($(CONFIG_LIBNETTLE_MINI),y)
 CONFIGURE_ARGS += --enable-mini-gmp
@@ -52,6 +55,11 @@ endif
 ifeq ($(CONFIG_CPU_SUBTYPE),neon)
 CONFIGURE_ARGS += \
 	--enable-arm-neon
+endif
+
+ifeq ($(ARCH),armeb)
+CONFIGURE_ARGS += \
+	--disable-assembler
 endif
 
 define Build/Compile

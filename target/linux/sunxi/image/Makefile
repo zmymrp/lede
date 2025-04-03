@@ -1,17 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # Copyright (C) 2013-2016 OpenWrt.org
 # Copyright (C) 2016 Yousong Zhou
-#
-# This is free software, licensed under the GNU General Public License v2.
-# See /LICENSE for more information.
-#
+
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
 FAT32_BLOCK_SIZE=1024
 FAT32_BLOCKS=$(shell echo $$(($(CONFIG_SUNXI_SD_BOOT_PARTSIZE)*1024*1024/$(FAT32_BLOCK_SIZE))))
 
-KERNEL_LOADADDR:=0x40008000
+DEVICE_VARS := SUNXI_DTS SUNXI_DTS_DIR
 
 define Build/sunxi-sdcard
 	rm -f $@.boot
@@ -32,15 +30,16 @@ endef
 # why \x00\x00\x00\x00 for zImage-initramfs
 define Device/Default
   PROFILES := Default
-  DEVICE_VARS := SUNXI_DTS SUNXI_UBOOT
   KERNEL_NAME := zImage
   KERNEL := kernel-bin | uImage none
   IMAGES := sdcard.img.gz
   IMAGE/sdcard.img.gz := sunxi-sdcard | append-metadata | gzip
+ifdef CONFIG_LINUX_6_6
+  SUNXI_DTS_DIR :=allwinner/
+endif
+  SUNXI_DTS = $$(SUNXI_DTS_DIR)$$(SOC)-$(lastword $(subst _, ,$(1)))
 endef
 
-include cortex-a7.mk
-include cortex-a8.mk
-include cortex-a53.mk
+include $(SUBTARGET).mk
 
 $(eval $(call BuildImage))

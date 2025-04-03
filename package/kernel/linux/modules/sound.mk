@@ -24,8 +24,7 @@ SOUNDCORE_FILES ?= \
 	$(LINUX_DIR)/sound/soundcore.ko \
 	$(LINUX_DIR)/sound/core/snd.ko \
 	$(LINUX_DIR)/sound/core/snd-hwdep.ko \
-	$(LINUX_DIR)/sound/core/seq/snd-seq-device.ko@lt4.13 \
-	$(LINUX_DIR)/sound/core/snd-seq-device.ko@ge4.13 \
+	$(LINUX_DIR)/sound/core/snd-seq-device.ko \
 	$(LINUX_DIR)/sound/core/snd-rawmidi.ko \
 	$(LINUX_DIR)/sound/core/snd-timer.ko \
 	$(LINUX_DIR)/sound/core/snd-pcm.ko \
@@ -192,10 +191,10 @@ define KernelPackage/sound-soc-core
   KCONFIG:= \
 	CONFIG_SND_SOC \
 	CONFIG_SND_SOC_ADI=n \
-	CONFIG_SND_SOC_DMAENGINE_PCM=y \
+	CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM=y \
 	CONFIG_SND_SOC_ALL_CODECS=n
   FILES:=$(LINUX_DIR)/sound/soc/snd-soc-core.ko
-  AUTOLOAD:=$(call AutoLoad,55, snd-soc-core)
+  AUTOLOAD:=$(call AutoLoad,55,snd-soc-core)
   $(call AddDepends/sound)
 endef
 
@@ -226,15 +225,49 @@ define KernelPackage/sound-soc-imx
 	$(LINUX_DIR)/sound/soc/fsl/snd-soc-fsl-ssi.ko \
 	$(LINUX_DIR)/sound/soc/fsl/imx-pcm-dma.ko
   AUTOLOAD:=$(call AutoLoad,56,snd-soc-imx-audmux snd-soc-fsl-ssi snd-soc-imx-pcm)
-  DEPENDS:=@TARGET_imx6 +kmod-sound-soc-core
+  DEPENDS:=@TARGET_imx +kmod-sound-soc-core
   $(call AddDepends/sound)
 endef
 
 define KernelPackage/sound-soc-imx/description
- Support for i.MX6 Platform sound (ssi/audmux/pcm)
+ Support for i.MX Platform sound (ssi/audmux/pcm)
 endef
 
 $(eval $(call KernelPackage,sound-soc-imx))
+
+
+define KernelPackage/sound-soc-mt7986
+  TITLE:=MediaTek MT7986 Audio support
+  KCONFIG:=CONFIG_SND_SOC_MT7986 CONFIG_SND_SOC_MT7986_WM8960
+  FILES:= \
+	$(LINUX_DIR)/sound/soc/mediatek/common/snd-soc-mtk-common.ko \
+	$(LINUX_DIR)/sound/soc/mediatek/mt7986/snd-soc-mt7986-afe.ko
+  AUTOLOAD:=$(call AutoLoad,56,snd-soc-mtk-common snd-soc-mt7986-afe)
+  DEPENDS:=@TARGET_mediatek_filogic +kmod-sound-soc-core
+  $(call AddDepends/sound)
+endef
+
+define KernelPackage/sound-soc-mt7986/description
+ Support for audio on systems using the MediaTek MT7986 SoC.
+endef
+
+$(eval $(call KernelPackage,sound-soc-mt7986))
+
+
+define KernelPackage/sound-soc-mt7986-wm8960
+  TITLE:=MediaTek MT7986 Audio support
+  KCONFIG:=CONFIG_SND_SOC_MT7986_WM8960
+  FILES:=$(LINUX_DIR)/sound/soc/mediatek/mt7986/mt7986-wm8960.ko
+  AUTOLOAD:=$(call AutoLoad,57,mt7986-wm8960)
+  DEPENDS:=@TARGET_mediatek_filogic +kmod-sound-soc-wm8960 +kmod-sound-soc-mt7986
+  $(call AddDepends/sound)
+endef
+
+define KernelPackage/sound-soc-mt7986-wm8960/description
+ Support for use of the Wolfson Audio WM8960 codec with the MediaTek MT7986 SoC.
+endef
+
+$(eval $(call KernelPackage,sound-soc-mt7986-wm8960))
 
 
 define KernelPackage/sound-soc-imx-sgtl5000
@@ -244,34 +277,41 @@ define KernelPackage/sound-soc-imx-sgtl5000
 	$(LINUX_DIR)/sound/soc/codecs/snd-soc-sgtl5000.ko \
 	$(LINUX_DIR)/sound/soc/fsl/snd-soc-imx-sgtl5000.ko
   AUTOLOAD:=$(call AutoLoad,57,snd-soc-sgtl5000 snd-soc-imx-sgtl5000)
-  DEPENDS:=@TARGET_imx6 +kmod-sound-soc-imx
+  DEPENDS:=@TARGET_imx +kmod-sound-soc-imx +kmod-regmap-i2c
   $(call AddDepends/sound)
 endef
 
 define KernelPackage/sound-soc-imx-sgtl5000/description
- Support for i.MX6 Platform sound SGTL5000 codec
+ Support for i.MX Platform sound SGTL5000 codec
 endef
 
 $(eval $(call KernelPackage,sound-soc-imx-sgtl5000))
 
 
-define KernelPackage/sound-soc-gw_avila
-  TITLE:=Gateworks Avila SoC sound support
-  KCONFIG:= \
-	CONFIG_SND_GW_AVILA_SOC \
-	CONFIG_SND_GW_AVILA_SOC_PCM \
-	CONFIG_SND_GW_AVILA_SOC_HSS
-  FILES:= \
-	$(LINUX_DIR)/sound/soc/codecs/snd-soc-tlv320aic3x.ko \
-	$(LINUX_DIR)/sound/soc/gw-avila/snd-soc-gw-avila.ko \
-	$(LINUX_DIR)/sound/soc/gw-avila/snd-soc-gw-avila-pcm.ko \
-	$(LINUX_DIR)/sound/soc/gw-avila/snd-soc-gw-avila-hss.ko
-  AUTOLOAD:=$(call AutoLoad,65,snd-soc-tlv320aic3x snd-soc-gw-avila snd-soc-gw-avila-pcm snd-soc-gw-avila-hss)
-  DEPENDS:=@TARGET_ixp4xx +kmod-sound-soc-core
+define KernelPackage/sound-soc-wm8960
+  TITLE:=SoC WM8960 codec support
+  KCONFIG:=CONFIG_SND_SOC_WM8960
+  FILES:=$(LINUX_DIR)/sound/soc/codecs/snd-soc-wm8960.ko
+  DEPENDS:=+kmod-sound-soc-core +kmod-i2c-core +kmod-regmap-i2c
+  AUTOLOAD:=$(call AutoProbe,snd-soc-wm8960)
   $(call AddDepends/sound)
 endef
 
-$(eval $(call KernelPackage,sound-soc-gw_avila))
+$(eval $(call KernelPackage,sound-soc-wm8960))
+
+
+define KernelPackage/sound-soc-spdif
+  TITLE:=SoC S/PDIF codec support
+  KCONFIG:=CONFIG_SND_SOC_SPDIF
+  FILES:= \
+	$(LINUX_DIR)/sound/soc/codecs/snd-soc-spdif-tx.ko \
+	$(LINUX_DIR)/sound/soc/codecs/snd-soc-spdif-rx.ko
+  DEPENDS:=+kmod-sound-soc-core
+  AUTOLOAD:=$(call AutoProbe,snd-soc-spdif-tx snd-soc-spdif-rx)
+  $(call AddDepends/sound)
+endef
+
+$(eval $(call KernelPackage,sound-soc-spdif))
 
 
 define KernelPackage/pcspkr
@@ -301,7 +341,7 @@ define KernelPackage/sound-dummy
   AUTOLOAD:=$(call AutoLoad,32,snd-dummy)
 endef
 
-define KernelPackage/sound_dummy/description
+define KernelPackage/sound-dummy/description
  Dummy sound device for Alsa when no hardware present
 endef
 
@@ -310,18 +350,21 @@ $(eval $(call KernelPackage,sound-dummy))
 define KernelPackage/sound-hda-core
   SUBMENU:=$(SOUND_MENU)
   TITLE:=HD Audio Sound Core Support
+  DEPENDS:=+kmod-ledtrig-audio
   KCONFIG:= \
-	CONFIG_SND_HDA_CORE@ge4.1 \
+	CONFIG_SND_HDA_CORE \
 	CONFIG_SND_HDA_HWDEP=y \
 	CONFIG_SND_HDA_RECONFIG=n \
+	CONFIG_SND_HDA_SCODEC_COMPONENT=y \
 	CONFIG_SND_HDA_INPUT_BEEP=n \
 	CONFIG_SND_HDA_PATCH_LOADER=n \
 	CONFIG_SND_HDA_GENERIC
   FILES:= \
-	$(LINUX_DIR)/sound/hda/snd-hda-core.ko@ge4.1 \
+	$(LINUX_DIR)/sound/hda/snd-hda-core.ko \
 	$(LINUX_DIR)/sound/pci/hda/snd-hda-codec.ko \
-	$(LINUX_DIR)/sound/pci/hda/snd-hda-codec-generic.ko
-  AUTOLOAD:=$(call AutoProbe,snd-hda-core@ge4.1 snd-hda-codec snd-hda-codec-generic)
+	$(LINUX_DIR)/sound/pci/hda/snd-hda-codec-generic.ko \
+	$(LINUX_DIR)/sound/pci/hda/snd-hda-scodec-component.ko@ge6.12
+  AUTOLOAD:=$(call AutoProbe,snd-hda-core snd-hda-codec snd-hda-codec-generic)
   $(call AddDepends/sound,+kmod-regmap-core)
 endef
 
@@ -522,13 +565,15 @@ $(eval $(call KernelPackage,sound-hda-codec-hdmi))
 define KernelPackage/sound-hda-intel
   SUBMENU:=$(SOUND_MENU)
   TITLE:=HD Audio Intel Driver
+  DEPENDS:=@TARGET_x86
   KCONFIG:= \
 	CONFIG_SOUND_PCI \
 	CONFIG_SND_HDA_INTEL
   FILES:= \
 	$(LINUX_DIR)/sound/pci/hda/snd-hda-intel.ko \
-	$(LINUX_DIR)/sound/pci/hda/snd-hda-controller.ko@lt4.4
-  AUTOLOAD:=$(call AutoProbe,snd-hda-controller@lt4.4 snd-hda-intel)
+	$(LINUX_DIR)/sound/hda/snd-intel-nhlt.ko@lt5.5 \
+	$(LINUX_DIR)/sound/hda/snd-intel-dspcfg.ko@ge5.5
+  AUTOLOAD:=$(call AutoProbe,snd-hda-intel)
   $(call AddDepends/sound,kmod-sound-hda-core)
 endef
 

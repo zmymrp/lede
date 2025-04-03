@@ -1,21 +1,20 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=uqmi
-PKG_RELEASE:=5
+PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL=$(PROJECT_GIT)/project/uqmi.git
-PKG_SOURCE_DATE:=2016-12-19
-PKG_SOURCE_VERSION:=8ceeab690d8c6f1e3afbd4bcaee7bc2ba3fbe165
-PKG_MIRROR_HASH:=b3637ff04e51769137af1c5e173e73311e11c3c2dcc49eeaca6aa3520f61d247
+PKG_SOURCE_DATE:=2024-08-25
+PKG_SOURCE_VERSION:=28b48a10dbcd1177095b73c6d8086d10114f49b8
+PKG_MIRROR_HASH:=bf1f8112c94ce49a7c03a4b9593141129d63ce679f98594257c1f6ab9bc49766
 PKG_MAINTAINER:=Matti Laakso <malaakso@elisanet.fi>
 
 PKG_LICENSE:=GPL-2.0
 PKG_LICENSE_FILES:=
 
-PKG_BUILD_PARALLEL:=1
-
 PKG_FLAGS:=nonshared
+PKG_BUILD_FLAGS:=gc-sections
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -34,16 +33,15 @@ define Package/uqmi/description
 endef
 
 TARGET_CFLAGS += \
-	-I$(STAGING_DIR)/usr/include -ffunction-sections -fdata-sections
-
-TARGET_LDFLAGS += -Wl,--gc-sections
+	-I$(STAGING_DIR)/usr/include \
+	-Wno-error=maybe-uninitialized
 
 CMAKE_OPTIONS += \
 	-DDEBUG=1
 
 define Package/uqmi/install
 	$(INSTALL_DIR) $(1)/sbin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/uqmi $(1)/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/uqmi/uqmi $(1)/sbin/
 	$(CP) ./files/* $(1)/
 endef
 

@@ -1,6 +1,5 @@
 #
-# Copyright (C) 2010-2014 OpenWrt.org
-# Copyright (C) 2016-2017 Luiz Angelo Daros de Luca <luizluca@gmail.com>
+# Copyright (C) 2010-2019 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -8,22 +7,23 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=elfutils
-PKG_VERSION:=0.175
-PKG_RELEASE:=4
+PKG_VERSION:=0.192
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_SOURCE_URL:=https://sourceware.org/$(PKG_NAME)/ftp/$(PKG_VERSION)
-PKG_HASH:=f7ef925541ee32c6d15ae5cb27da5f119e01a5ccdbe9fe57bf836730d7b7a65b
+PKG_SOURCE_URL:=https://sourceware.org/$(PKG_NAME)/ftp/$(PKG_VERSION) \
+                https://mirrors.kernel.org/sourceware/$(PKG_NAME)/$(PKG_VERSION)
+PKG_HASH:=616099beae24aba11f9b63d86ca6cc8d566d968b802391334c91df54eab416b4
+
 PKG_MAINTAINER:=Luiz Angelo Daros de Luca <luizluca@gmail.com>
-PKG_LICENSE:=GPL-3.0+
+PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=COPYING COPYING-GPLV2 COPYING-LGPLV3
 PKG_CPE_ID:=cpe:/a:elfutils_project:elfutils
+
 PKG_FIXUP:=autoreconf
-
 PKG_INSTALL:=1
-PKG_USE_MIPS16:=0
-
-PKG_BUILD_DEPENDS:=USE_UCLIBC:argp-standalone USE_MUSL:argp-standalone
+PKG_USE_MIPS16:=1
+PKG_BUILD_DEPENDS:=!USE_GLIBC:argp-standalone
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
@@ -44,7 +44,7 @@ endef
 
 define Package/libdw
   $(call Package/elfutils/Default)
-  DEPENDS:=+libelf +libbz2
+  DEPENDS:=+libelf +libbz2 +USE_MUSL:musl-fts
   TITLE+= (libdw)
 endef
 
@@ -61,11 +61,38 @@ else
 CONFIGURE_ARGS += --disable-nls
 endif
 
+HOST_CONFIGURE_ARGS += \
+	--disable-shared \
+	--disable-nls \
+	--disable-debuginfod \
+	--disable-libdebuginfod \
+	--without-bzlib \
+	--without-lzma \
+	--without-zstd
+
 CONFIGURE_ARGS += \
 	--program-prefix=eu- \
-	--without-lzma
+	--disable-debuginfod \
+	--disable-libdebuginfod \
+	--without-bzlib \
+	--without-lzma \
+	--without-zstd
 
-TARGET_CFLAGS += -D_GNU_SOURCE -Wno-unused-result -Wno-format-nonliteral
+HOST_CONFIGURE_VARS += \
+	ac_cv_search__obstack_free=yes
+
+CONFIGURE_VARS += \
+	ac_cv_search__obstack_free=yes
+
+TARGET_CFLAGS += \
+	-D_GNU_SOURCE \
+	-Wno-unused-result \
+	-Wno-format-nonliteral
+
+ifneq ($(filter $(GCC_MAJOR_VERSION),12 13),)
+TARGET_CFLAGS += \
+	-Wno-error=use-after-free
+endif
 
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/include
@@ -94,6 +121,7 @@ define Package/libelf/install
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libelf{-*.so,*.so.*} $(1)/usr/lib/
 endef
 
-$(eval $(call BuildPackage,libasm))
-$(eval $(call BuildPackage,libdw))
+# these lines need to be ordered by dependency because of ABI versioning
 $(eval $(call BuildPackage,libelf))
+$(eval $(call BuildPackage,libdw))
+$(eval $(call BuildPackage,libasm))

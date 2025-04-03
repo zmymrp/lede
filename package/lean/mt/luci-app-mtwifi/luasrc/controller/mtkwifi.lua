@@ -1,9 +1,9 @@
 -- This module is a demo to configure MTK' proprietary WiFi driver.
 -- Basic idea is to bypass uci and edit wireless profile (mt76xx.dat) directly.
--- LuCI's WiFi configuration is more logical and elegent, but it's quite tricky to 
+-- LuCI's WiFi configuration is more logical and elegent, but it's quite tricky to
 -- translate uci into MTK's WiFi profile (like we did in "uci2dat").
 -- And you will get your hands dirty.
--- 
+--
 -- Hua Shao <nossiac@163.com>
 
 module("luci.controller.mtkwifi", package.seeall)
@@ -110,19 +110,13 @@ function dev_cfg(devname)
         cfgs.VHT_Sec80_Channel = http.formvalue("VHT_Sec80_Channel") or ""
     end
 
-    if cfgs.ApCliAuthMode == "WEP" then
-        cfgs.ApCliEncrypType = http.formvalue("__apcli_wep_enctype")
-    else
-        cfgs.ApCliEncrypType = http.formvalue("__apcli_wpa_enctype")
-    end
-
     local mimo = http.formvalue("__mimo")
     if mimo == "0" then
         cfgs.ETxBfEnCond=1
         cfgs.MUTxRxEnable=0
-        cfgs.ITxBfEn=0
+        cfgs.ITxBfEn=1
     elseif mimo == "1" then
-        cfgs.ETxBfEnCond=0
+        cfgs.ETxBfEnCond=1
         cfgs.MUTxRxEnable=0
         cfgs.ITxBfEn=1
     elseif mimo == "2" then
@@ -131,24 +125,16 @@ function dev_cfg(devname)
         cfgs.ITxBfEn=1
     elseif mimo == "3" then
         cfgs.ETxBfEnCond=1
-        if tonumber(cfgs.ApCliEnable) == 1 then
-            cfgs.MUTxRxEnable=3
-        else
-            cfgs.MUTxRxEnable=1
-        end
-        cfgs.ITxBfEn=0
+        cfgs.MUTxRxEnable=0
+        cfgs.ITxBfEn=1
     elseif mimo == "4" then
         cfgs.ETxBfEnCond=1
-        if tonumber(cfgs.ApCliEnable) == 1 then
-            cfgs.MUTxRxEnable=3
-        else
-            cfgs.MUTxRxEnable=1
-        end
+        cfgs.MUTxRxEnable=0
         cfgs.ITxBfEn=1
     else
-        cfgs.ETxBfEnCond=0
-        cfgs.MUTxRxEnable=0
-        cfgs.ITxBfEn=0
+       cfgs.ETxBfEnCond=1
+       cfgs.MUTxRxEnable=0
+       cfgs.ITxBfEn=1
     end
 
 --    if cfgs.ApCliEnable == "1" then
@@ -231,7 +217,7 @@ function vif_del(dev, vif)
     local devs = mtkwifi.get_all_devs()
     local idx = devs[devname]["vifs"][vifname].vifidx -- or tonumber(string.match(vifname, "%d+")) + 1
     mtkwifi.debug("idx="..idx, devname, vifname)
-    local profile = devs[devname].profile 
+    local profile = devs[devname].profile
     assert(profile)
     if idx and tonumber(idx) >= 0 then
         local cfgs = mtkwifi.load_profile(profile)
@@ -507,13 +493,13 @@ function initialize_multiBssParameters(cfgs,vif_idx)
     return cfgs
 end
 
-function vif_cfg(dev, vif) 
+function vif_cfg(dev, vif)
     local devname, vifname = dev, vif
     if not devname then devname = vif end
     mtkwifi.debug("devname="..devname)
     mtkwifi.debug("vifname="..(vifname or ""))
     local devs = mtkwifi.get_all_devs()
-    local profile = devs[devname].profile 
+    local profile = devs[devname].profile
     assert(profile)
 
     local cfgs = mtkwifi.load_profile(profile)
@@ -775,19 +761,8 @@ function apcli_connect(dev, vif)
     local cfgs = mtkwifi.load_profile(profiles[devname])
     cfgs.ApCliEnable = "1"
     mtkwifi.save_profile(cfgs, profiles[devname])
-
-    os.execute("ifconfig "..vifname.." up")
-    local brvifs = mtkwifi.__trim(mtkwifi.read_pipe("uci get network.lan.ifname"))
-    if not string.match(brvifs, vifname) then
-        brvifs = brvifs.." "..vifname
-        nixio.syslog("debug", "add "..vifname.." into lan")
-        os.execute("uci set network.lan.ifname=\""..brvifs.."\"")
-        os.execute("uci commit")
-        os.execute("ubus call network.interface.lan add_device \"{\\\"name\\\":\\\""..vifname.."\\\"}\"")
-    end
-
-    os.execute("iwpriv "..vifname.." set MACRepeaterEn="..cfgs.MACRepeaterEn)
     os.execute("iwpriv "..vifname.." set ApCliEnable=0")
+    os.execute("ifconfig "..vifname.." up")
     os.execute("iwpriv "..vifname.." set Channel="..cfgs.Channel)
     os.execute("iwpriv "..vifname.." set ApCliAuthMode="..cfgs.ApCliAuthMode)
     os.execute("iwpriv "..vifname.." set ApCliEncrypType="..cfgs.ApCliEncrypType)
@@ -816,23 +791,11 @@ function apcli_disconnect(dev, vif)
     local profiles = mtkwifi.search_dev_and_profile()
     mtkwifi.debug(profiles[devname])
     assert(profiles[devname])
-
     local cfgs = mtkwifi.load_profile(profiles[devname])
-    cfgs.ApCliEnable = "1"
+    cfgs.ApCliEnable = "0"
     mtkwifi.save_profile(cfgs, profiles[devname])
-
     os.execute("iwpriv "..vifname.." set ApCliEnable=0")
-
-    local brvifs = mtkwifi.__trim(mtkwifi.read_pipe("uci get network.lan.ifname"))
-    if string.match(brvifs, vifname) then
-        brvifs = mtkwifi.__trim(string.gsub(brvifs, vifname, ""))
-        nixio.syslog("debug", "add "..vifname.." into lan")
-        os.execute("uci set network.lan.ifname=\""..brvifs.."\"")
-        os.execute("uci commit")
-        os.execute("ubus call network.interface.lan remove_device \"{\\\"name\\\":\\\""..vifname.."\\\"}\"")
-    end
     os.execute("ifconfig "..vifname.." down")
-
     luci.http.redirect(luci.dispatcher.build_url("admin", "network", "wifi"))
 end
 
