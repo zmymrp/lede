@@ -6,7 +6,7 @@
 #include <dt-bindings/input/input.h>
 
 / {
-	compatible = "g,ax_ax1800_f", "mediatek,mt7621-soc";
+	compatible = "cmcc,g-ax1800-f", "mediatek,mt7621-soc";
 	model = "CMCC G-AX1800-F";
 
 	aliases {
