@@ -1880,6 +1880,25 @@ define Device/xiaomi_mi-router-ac2100
 endef
 TARGET_DEVICES += xiaomi_mi-router-ac2100
 
+define Device/cmcc_g-ax1800-f
+  $(Device/dsa-migration)
+  $(Device/uimage-lzma-loader)
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  UBINIZE_OPTS := -E 5
+  KERNEL_SIZE := 4096k
+  IMAGE_SIZE := 128512k
+  IMAGES += factory.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-ubi | \
+	check-size
+  DEVICE_VENDOR := CMCC
+  DEVICE_MODEL := G-AX1800-F
+  DEVICE_PACKAGES += kmod-mt7915-firmware wpad-openssl uboot-envtools
+  SUPPORTED_DEVICES += cmcc,g-ax1800-f
+endef
+TARGET_DEVICES += cmcc_g-ax1800-f
+
 define Device/xiaomi_mi-router-cr660x
   $(Device/dsa-migration)
   $(Device/uimage-lzma-loader)
